@@ -1,12 +1,15 @@
-export type StatKey =
+export type CoreStatKey =
   | "health"
   | "happiness"
-  | "money"
   | "reputation"
   | "education"
   | "skill"
   | "relationships"
   | "stress";
+
+export type FinanceStatKey = "money" | "cash" | "income" | "expenses" | "debt" | "savings" | "rent";
+
+export type StatKey = CoreStatKey | FinanceStatKey;
 
 export type HiddenTrait =
   | "discipline"
@@ -19,6 +22,17 @@ export type HiddenTrait =
   | "curiosity"
   | "optimism"
   | "ambition";
+
+export type EventKind = "normal" | "queued" | "milestone";
+export type GamePhase = "hub" | "event" | "consequence";
+export type GoalId =
+  | "graduate_high_school"
+  | "get_into_university"
+  | "build_fitness"
+  | "get_promoted"
+  | "save_emergency_fund"
+  | "learn_programming"
+  | "build_social_circle";
 
 export type Stats = Record<StatKey, number>;
 export type Traits = Record<HiddenTrait, number>;
@@ -40,18 +54,28 @@ export interface Memory {
   year: number;
   title: string;
   description: string;
+  category: string;
   tone: "positive" | "negative" | "neutral";
   icon: string;
+}
+
+export interface GoalProgress {
+  id: GoalId;
+  title: string;
+  description: string;
+  target: number;
+  progress: number;
+  contributions: string[];
 }
 
 export interface Effect {
   stats?: Partial<Stats>;
   traits?: Partial<Traits>;
-  flags?: string[];        // add flags
+  flags?: string[];
   removeFlags?: string[];
   relationships?: { id: string; trust?: number; respect?: number; love?: number; closeness?: number }[];
-  memory?: { title: string; description: string; tone: "positive" | "negative" | "neutral"; icon: string };
-  queueEvents?: { eventId: string; inTurns: number }[]; // delayed ripple
+  memory?: { title: string; description: string; category?: string; tone: "positive" | "negative" | "neutral"; icon: string };
+  queueEvents?: { eventId: string; inTurns: number }[];
 }
 
 export interface Choice {
@@ -61,13 +85,16 @@ export interface Choice {
   icon?: string;
   requires?: Requirement;
   effects: Effect;
+  outcomeNarrative?: string;
+  outcomeReason?: string;
+  outcomeHints?: string[];
 }
 
 export interface Requirement {
   minStats?: Partial<Stats>;
   minTraits?: Partial<Traits>;
-  flags?: string[];       // must have all
-  notFlags?: string[];    // must not have any
+  flags?: string[];
+  notFlags?: string[];
   minAge?: number;
   maxAge?: number;
 }
@@ -78,6 +105,7 @@ export interface GameEvent {
   description: string;
   category: string;
   emoji: string;
+  kind?: EventKind;
   weight?: number;
   requires?: Requirement;
   choices: Choice[];
@@ -88,13 +116,37 @@ export interface QueuedEvent {
   triggerTurn: number;
 }
 
+export interface ActivityDefinition {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  cost: number;
+  effects: Effect;
+  goalIds: GoalId[];
+  hint: string;
+}
+
+export interface OutcomeSummary {
+  title: string;
+  narrative: string;
+  statChanges: { key: StatKey; delta: number }[];
+  relationshipChanges: { id: string; name: string; fields: string[] }[];
+  moneyChanges: { label: string; delta: number }[];
+  newFlags: string[];
+  newMemory?: Memory;
+  reasons: string[];
+  futureChance: string[];
+  futureRisk: string[];
+}
+
 export interface GameState {
   version: number;
   createdAt: number;
   name: string;
   avatarSeed: number;
   age: number;
-  turn: number; // 0-based, each turn = 3 months
+  turn: number;
   startYear: number;
   stats: Stats;
   traits: Traits;
@@ -105,5 +157,10 @@ export interface GameState {
   seenEvents: string[];
   queue: QueuedEvent[];
   alive: boolean;
+  phase: GamePhase;
+  actionPoints: number;
+  goals: GoalProgress[];
+  jobTitle: string;
+  educationStatus: string;
   currentEventId?: string;
 }

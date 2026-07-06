@@ -29,8 +29,10 @@ export function EventCard({ state, event, onChoose }: Props) {
       <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: "var(--gradient-accent)" }} />
 
       <div className="relative">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="text-4xl md:text-5xl">{event.emoji}</div>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-16 h-16 rounded-3xl border border-white/10 bg-white/[0.06] flex items-center justify-center text-3xl shadow-accent-glow">
+            {event.emoji}
+          </div>
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-turquoise)] font-semibold">
               {event.category}

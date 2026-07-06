@@ -4,6 +4,10 @@ import { Avatar } from "@/components/game/Avatar";
 import { StatsPanel } from "@/components/game/StatsPanel";
 import { EventCard } from "@/components/game/EventCard";
 import { Timeline } from "@/components/game/Timeline";
+import { ConsequenceCard } from "@/components/game/ConsequenceCard";
+import { LifeHub } from "@/components/game/LifeHub";
+import { GoalPanel } from "@/components/game/GoalPanel";
+import { LifeJournal } from "@/components/game/LifeJournal";
 import { currentYear } from "@/engine/engine";
 import { useEffect } from "react";
 
@@ -13,7 +17,7 @@ export const Route = createFileRoute("/play")({
 
 function PlayPage() {
   const nav = useNavigate();
-  const { state, event, choose, startNew, reset, lastEffectPing } = useGame();
+  const { state, event, consequence, choose, startNew, reset, lastEffectPing, spendActivity, endQuarter, continueAfterConsequence } = useGame();
 
   // Auto-start if no save
   useEffect(() => {
@@ -118,6 +122,12 @@ function PlayPage() {
               Age {state.age} · {season} {currentYear(state)}
             </span>
           </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">{state.jobTitle}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">{state.educationStatus}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">Cash ${state.stats.cash}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">Savings ${state.stats.savings}</span>
+          </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {state.flags.slice(-6).map((f) => (
               <span
@@ -134,7 +144,11 @@ function PlayPage() {
       {/* Main grid */}
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-6">
-          {event ? (
+          {consequence ? (
+            <ConsequenceCard state={state} summary={consequence} onContinue={continueAfterConsequence} />
+          ) : state.phase === "hub" ? (
+            <LifeHub state={state} onSelectActivity={spendActivity} onEndQuarter={endQuarter} />
+          ) : event ? (
             <EventCard state={state} event={event} onChoose={choose} />
           ) : (
             <div className="glass-strong rounded-3xl p-8 text-center">
@@ -143,10 +157,12 @@ function PlayPage() {
           )}
 
           <Timeline memories={state.memories} age={state.age} />
+          <LifeJournal memories={state.memories} />
         </div>
 
         <aside className="space-y-6">
           <StatsPanel stats={state.stats} pulse={lastEffectPing} />
+          <GoalPanel state={state} />
 
           <div className="glass rounded-3xl p-5">
             <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-foreground/90 mb-3">

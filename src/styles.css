@@ -184,6 +184,21 @@
   100% { transform: scale(1); }
 }
 
+@utility panel-illustration {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, oklch(1 0 0 / 0.12), oklch(1 0 0 / 0.05));
+}
+
+@utility panel-illustration::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 20% 20%, oklch(0.78 0.15 190 / 0.26), transparent 32%), radial-gradient(circle at 80% 30%, oklch(0.55 0.22 264 / 0.2), transparent 30%), radial-gradient(circle at 60% 80%, oklch(0.72 0.18 155 / 0.22), transparent 32%);
+  pointer-events: none;
+}
+
 @utility animate-ripple {
   animation: ripple-pulse 4s ease-out infinite;
 }

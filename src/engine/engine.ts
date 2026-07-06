@@ -1,5 +1,29 @@
-import type { Choice, Effect, GameEvent, GameState, Requirement, StatKey } from "./types";
+import type { Choice, Effect, GameEvent, GameState, GoalId, GoalProgress, Requirement, StatKey } from "./types";
 import { clamp } from "./newGame";
+
+const GOAL_DEFAULTS: Record<GoalId, { title: string; description: string; target: number }> = {
+  graduate_high_school: { title: "Graduate high school", description: "Stay on track academically", target: 100 },
+  get_into_university: { title: "Get into university", description: "Build the case for higher education", target: 100 },
+  build_fitness: { title: "Build fitness", description: "Keep your body strong", target: 100 },
+  get_promoted: { title: "Get promoted", description: "Earn trust and results at work", target: 100 },
+  save_emergency_fund: { title: "Save emergency fund", description: "Build a cushion for hard times", target: 100 },
+  learn_programming: { title: "Learn programming", description: "Grow your technical skill", target: 100 },
+  build_social_circle: { title: "Build social circle", description: "Create stronger community", target: 100 },
+};
+
+function defaultGoals(existing: GoalProgress[] = []): GoalProgress[] {
+  return (Object.keys(GOAL_DEFAULTS) as GoalId[]).map((id) => {
+    const existingGoal = existing.find((goal) => goal.id === id);
+    return {
+      id,
+      title: GOAL_DEFAULTS[id].title,
+      description: GOAL_DEFAULTS[id].description,
+      target: GOAL_DEFAULTS[id].target,
+      progress: existingGoal?.progress ?? 0,
+      contributions: existingGoal?.contributions ?? [],
+    };
+  });
+}
 
 export function currentYear(g: GameState) {
   return g.startYear + Math.floor(g.turn / 4);
@@ -29,8 +53,9 @@ export function choiceAvailable(g: GameState, c: Choice) {
 }
 
 export function pickEvent(g: GameState, events: GameEvent[]): GameEvent | null {
-  // 1. queued events fire first
-  const due = g.queue.find((q) => q.triggerTurn <= g.turn);
+  const due = [...g.queue]
+    .filter((q) => q.triggerTurn <= g.turn)
+    .sort((a, b) => a.triggerTurn - b.triggerTurn)[0];
   if (due) {
     const ev = events.find((e) => e.id === due.eventId);
     if (ev) return ev;
@@ -38,26 +63,63 @@ export function pickEvent(g: GameState, events: GameEvent[]): GameEvent | null {
 
   const pool = events.filter((e) => {
     if (!meets(g, e.requires)) return false;
-    // avoid immediate repeats: don't repeat within 8 turns
     const lastIdx = [...g.seenEvents].reverse().indexOf(e.id);
     if (lastIdx !== -1 && lastIdx < 8) return false;
     return true;
   });
 
-  if (pool.length === 0) {
-    // fallback: allow any that meet reqs
+  const milestonePool = pool.filter((e) => e.kind === "milestone");
+  const activePool = milestonePool.length > 0 ? milestonePool : pool;
+
+  if (activePool.length === 0) {
     const any = events.filter((e) => meets(g, e.requires));
     if (any.length === 0) return null;
     return any[Math.floor(Math.random() * any.length)];
   }
 
-  const total = pool.reduce((s, e) => s + (e.weight ?? 10), 0);
+  const total = activePool.reduce((s, e) => s + (e.weight ?? 10), 0);
   let r = Math.random() * total;
-  for (const e of pool) {
+  for (const e of activePool) {
     r -= e.weight ?? 10;
     if (r <= 0) return e;
   }
-  return pool[0];
+  return activePool[0];
+}
+
+function updateGoals(next: GameState, eff: Effect, eventTitle: string): void {
+  const goalMap = new Map(next.goals.map((goal) => [goal.id, goal]));
+  const addContribution = (goalId: GoalId, contribution: string) => {
+    const goal = goalMap.get(goalId);
+    if (!goal) return;
+    if (!goal.contributions.includes(contribution)) goal.contributions.push(contribution);
+    goal.progress = clamp(goal.progress + 6);
+  };
+
+  if (eff.stats) {
+    if ((eff.stats.education ?? 0) > 0) addContribution("graduate_high_school", "Education");
+    if ((eff.stats.education ?? 0) > 0) addContribution("get_into_university", "Education");
+    if ((eff.stats.health ?? 0) > 0) addContribution("build_fitness", "Health");
+    if ((eff.stats.cash ?? 0) > 0 || (eff.stats.money ?? 0) > 0) addContribution("save_emergency_fund", "Savings");
+    if ((eff.stats.reputation ?? 0) > 0) addContribution("get_promoted", "Reputation");
+    if ((eff.stats.skill ?? 0) > 0) addContribution("learn_programming", "Programming");
+    if ((eff.stats.relationships ?? 0) > 0) addContribution("build_social_circle", "Social bonds");
+  }
+
+  if (eff.traits) {
+    if ((eff.traits.discipline ?? 0) > 0) addContribution("graduate_high_school", "Discipline");
+    if ((eff.traits.ambition ?? 0) > 0) addContribution("get_into_university", "Ambition");
+    if ((eff.traits.responsibility ?? 0) > 0) addContribution("build_fitness", "Routine");
+    if ((eff.traits.confidence ?? 0) > 0) addContribution("get_promoted", "Confidence");
+  }
+
+  if (eventTitle.includes("college") || eventTitle.includes("university") || eventTitle.includes("school")) {
+    addContribution("graduate_high_school", "School events");
+  }
+  if (eventTitle.includes("work") || eventTitle.includes("career") || eventTitle.includes("job")) {
+    addContribution("get_promoted", "Career events");
+  }
+
+  next.goals = Array.from(goalMap.values());
 }
 
 export function applyEffect(g: GameState, eff: Effect, eventTitle: string): GameState {
@@ -70,6 +132,7 @@ export function applyEffect(g: GameState, eff: Effect, eventTitle: string): Game
     memories: [...g.memories],
     history: [...g.history],
     queue: [...g.queue],
+    goals: g.goals?.length ? g.goals.map((goal) => ({ ...goal, contributions: [...goal.contributions] })) : defaultGoals(),
   };
 
   if (eff.stats) {
@@ -107,17 +170,18 @@ export function applyEffect(g: GameState, eff: Effect, eventTitle: string): Game
       year: currentYear(g),
       title: eff.memory.title,
       description: eff.memory.description,
+      category: eff.memory.category ?? "life",
       tone: eff.memory.tone,
       icon: eff.memory.icon,
     });
   } else {
-    // auto-memory for choice
     next.memories.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       age: g.age,
       year: currentYear(g),
       title: eventTitle,
       description: "",
+      category: "life",
       tone: "neutral",
       icon: "•",
     });
@@ -127,18 +191,24 @@ export function applyEffect(g: GameState, eff: Effect, eventTitle: string): Game
       next.queue.push({ eventId: q.eventId, triggerTurn: g.turn + q.inTurns });
     }
   }
+
+  updateGoals(next, eff, eventTitle);
   return next;
 }
 
 export function advanceTurn(g: GameState, consumedEventId?: string): GameState {
-  const next: GameState = { ...g, turn: g.turn + 1 };
+  const next: GameState = { ...g, turn: g.turn + 1, phase: "hub" };
   next.age = 16 + Math.floor(next.turn / 4);
 
-  // slow drift each turn — passive life
   next.stats = { ...g.stats };
   next.stats.stress = clamp(next.stats.stress + 1);
-  next.stats.money = clamp(next.stats.money + 1); // small allowance
+  next.stats.money = clamp(next.stats.money + 1);
+  next.stats.cash = clamp(next.stats.cash + 1);
   next.stats.happiness = clamp(next.stats.happiness - (next.stats.stress > 70 ? 3 : 0));
+  next.stats.savings = clamp(next.stats.savings + Math.max(0, next.stats.cash - next.stats.expenses));
+  next.stats.expenses = clamp(next.stats.expenses + Math.max(0, next.stats.rent));
+  next.stats.income = clamp(next.stats.income + 1);
+  next.actionPoints = 2;
 
   // stress -> health
   if (next.stats.stress > 80) next.stats.health = clamp(next.stats.health - 2);
