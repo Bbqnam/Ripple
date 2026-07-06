@@ -9,6 +9,7 @@ import { LifeHub } from "@/components/game/LifeHub";
 import { GoalPanel } from "@/components/game/GoalPanel";
 import { LifeJournal } from "@/components/game/LifeJournal";
 import { currentYear } from "@/engine/engine";
+import { LIFE_MOMENTS } from "@/engine/lifeMoments";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/play")({
@@ -88,6 +89,7 @@ function PlayPage() {
   }
 
   const season = ["Spring", "Summer", "Autumn", "Winter"][state.turn % 4];
+  const upcomingMoment = LIFE_MOMENTS.find((moment) => moment.age >= state.age && state.age < moment.age + 3);
 
   return (
     <main className="min-h-screen px-4 md:px-8 py-6 max-w-6xl mx-auto">
@@ -128,6 +130,12 @@ function PlayPage() {
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">Cash ${state.stats.cash}</span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">Savings ${state.stats.savings}</span>
           </div>
+          {upcomingMoment && (
+            <div className="mt-3 rounded-2xl border border-[color:var(--color-warning)]/20 bg-[color:var(--color-warning)]/[0.08] px-3 py-2 text-sm text-foreground/80">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-warning)]">Life moment approaching</div>
+              <div className="font-semibold">{upcomingMoment.title}</div>
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {state.flags.slice(-6).map((f) => (
               <span

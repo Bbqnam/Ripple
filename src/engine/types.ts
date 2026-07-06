@@ -106,6 +106,12 @@ export interface GameEvent {
   category: string;
   emoji: string;
   kind?: EventKind;
+  sceneType?: "phone" | "letter" | "meeting" | "report" | "interview" | "hospital" | "court" | "news" | "home" | "celebration" | "street";
+  location?: string;
+  environment?: string;
+  focus?: string;
+  momentTitle?: string;
+  tone?: "positive" | "negative" | "neutral";
   weight?: number;
   requires?: Requirement;
   choices: Choice[];
